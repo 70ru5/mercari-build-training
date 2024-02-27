@@ -63,7 +63,7 @@ func root(c echo.Context) error {
 }
 
 // addItem processes form data and saves item information.
-func (db *ServerImpl) addItem(c echo.Context) error {
+func (s *ServerImpl) addItem(c echo.Context) error {
 	// Get form data
 	name := c.FormValue("name")
 	category := c.FormValue("category")
@@ -84,7 +84,7 @@ func (db *ServerImpl) addItem(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 
-	if err := db.saveItem(name, category, fileName); err != nil {
+	if err := s.saveItem(name, category, fileName); err != nil {
 		c.Logger().Errorf("Error while saving item information: %w", err)
 		res := Response{Message: "Error while saving item information"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
@@ -97,10 +97,10 @@ func (db *ServerImpl) addItem(c echo.Context) error {
 }
 
 // saveItem writes the item information into the database.
-func (db *ServerImpl) saveItem(name, category, fileName string) error {
+func (s *ServerImpl) saveItem(name, categoryName, fileName string) error {
 
 	// Transaction starts.
-	tx, err := db.DB.Begin()
+	tx, err := s.DB.Begin()
 	if err != nil {
 		err = fmt.Errorf("error while beginning transaction: %w", err)
 		return err
@@ -111,7 +111,7 @@ func (db *ServerImpl) saveItem(name, category, fileName string) error {
 		}
 	}()
 
-	categoryId, err := checkCategoryId(category, tx)
+	categoryId, err := checkCategoryId(categoryName, tx)
 	if err != nil {
 		err = fmt.Errorf("error while searching for category id: %w", err)
 		return err
@@ -199,9 +199,9 @@ func saveImage(image *multipart.FileHeader) (string, error) {
 }
 
 // getItems gets all the item information.
-func (db *ServerImpl) getItems(c echo.Context) error {
+func (s *ServerImpl) getItems(c echo.Context) error {
 
-	items, err := db.readItems()
+	items, err := s.readItems()
 	if err != nil {
 		c.Logger().Errorf("Error while reading item information: %w", err)
 		res := Response{Message: "Error while reading item information"}
@@ -212,10 +212,10 @@ func (db *ServerImpl) getItems(c echo.Context) error {
 }
 
 // readItems reads database and returns all the item information.
-func (db *ServerImpl) readItems() (Items, error) {
+func (s *ServerImpl) readItems() (Items, error) {
 
 	const selectAllItems = "SELECT items.name, categories.name FROM items JOIN categories ON items.category_id = categories.id"
-	rows, err := db.DB.Query(selectAllItems)
+	rows, err := s.DB.Query(selectAllItems)
 	if err != nil {
 		return Items{}, err
 	}
@@ -229,12 +229,12 @@ func (db *ServerImpl) readItems() (Items, error) {
 	return *items, nil
 }
 
-func (db *ServerImpl) searchItems(c echo.Context) error {
+func (s *ServerImpl) searchItems(c echo.Context) error {
 	keyword := c.QueryParam("keyword")
 	key := "%" + keyword + "%"
 
 	const searchWithKey = "SELECT items.name, categories.name FROM items JOIN categories ON items.category_id = categories.id WHERE items.name LIKE ?"
-	rows, err := db.DB.Query(searchWithKey, key)
+	rows, err := s.DB.Query(searchWithKey, key)
 	if err != nil {
 		c.Logger().Errorf("Error while searching with keyword: %w", err)
 		res := Response{Message: "Error while searching with keyword"}
@@ -269,7 +269,7 @@ func getImg(c echo.Context) error {
 }
 
 // getInfo gets detailed information of the designeted item by id.
-func (db *ServerImpl) getInfoById(c echo.Context) error {
+func (s *ServerImpl) getInfoById(c echo.Context) error {
 	itemId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.Logger().Errorf("Invalid ID: %w", err)
@@ -279,7 +279,7 @@ func (db *ServerImpl) getInfoById(c echo.Context) error {
 
 	var item Item
 	selectById := "SELECT items.name, categories.name, items.image_name FROM items JOIN categories ON items.category_id = categories.id WHERE items.id = ?"
-	rows := db.DB.QueryRow(selectById, itemId)
+	rows := s.DB.QueryRow(selectById, itemId)
 	err = rows.Scan(&item.Name, &item.Category, &item.ImageName)
 	if err != nil {
 		c.Logger().Errorf("Error while searching item with ID: %w", err)
