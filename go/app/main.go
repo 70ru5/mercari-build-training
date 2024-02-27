@@ -53,13 +53,17 @@ func (items *Items) ScanRowsToItems(rows *sql.Rows) error {
 	return nil
 }
 
+type ServerImpl struct {
+	DB *sql.DB
+}
+
 func root(c echo.Context) error {
 	res := Response{Message: "Hello, world!!"}
 	return c.JSON(http.StatusOK, res)
 }
 
 // addItem processes form data and saves item information.
-func addItem(c echo.Context) error {
+func (db *ServerImpl) addItem(c echo.Context) error {
 	// Get form data
 	name := c.FormValue("name")
 	category := c.FormValue("category")
@@ -80,7 +84,7 @@ func addItem(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 
-	if err := saveItem(name, category, fileName); err != nil {
+	if err := db.saveItem(name, category, fileName); err != nil {
 		c.Logger().Errorf("Error while saving item information: %w", err)
 		res := Response{Message: "Error while saving item information"}
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
@@ -93,16 +97,10 @@ func addItem(c echo.Context) error {
 }
 
 // saveItem writes the item information into the database.
-func saveItem(name, category, fileName string) error {
-
-	dbCon, err := connectDB(DBPath)
-	if err != nil {
-		return err
-	}
-	defer dbCon.Close()
+func (db *ServerImpl) saveItem(name, category, fileName string) error {
 
 	// Transaction starts.
-	tx, err := dbCon.Begin()
+	tx, err := db.DB.Begin()
 	if err != nil {
 		err = fmt.Errorf("error while beginning transaction: %w", err)
 		return err
@@ -139,15 +137,27 @@ func checkCategoryId(category string, tx *sql.Tx) (int, error) {
 	var categoryId int
 
 	const findCategoryId = "SELECT id FROM categories WHERE name = ?"
-	rows := tx.QueryRow(findCategoryId, categoryId)
+	rows := tx.QueryRow(findCategoryId, category)
 
 	err := rows.Scan(&categoryId)
-	if err != nil {
-		makeNewCategory := "INSERT INTO categories (name) values (?)"
-		_, err := tx.Exec(makeNewCategory, category)
+	if err == sql.ErrNoRows {
+		const makeNewCategory = "INSERT INTO categories (name) values (?)"
+		result, err := tx.Exec(makeNewCategory, category)
 		if err != nil {
+			log.Errorf("error while inserting new category: %w", err)
 			return 0, err
 		}
+
+		newId, err := result.LastInsertId()
+		if err != nil {
+			log.Errorf("error while getting new category ID: %w", err)
+			return 0, err
+		}
+		categoryId = int(newId)
+
+	} else if err != nil {
+		log.Errorf("error while scanning category ID: %w", err)
+		return 0, err
 	}
 
 	return categoryId, nil
@@ -189,8 +199,9 @@ func saveImage(image *multipart.FileHeader) (string, error) {
 }
 
 // getItems gets all the item information.
-func getItems(c echo.Context) error {
-	items, err := readItems()
+func (db *ServerImpl) getItems(c echo.Context) error {
+
+	items, err := db.readItems()
 	if err != nil {
 		c.Logger().Errorf("Error while reading item information: %w", err)
 		res := Response{Message: "Error while reading item information"}
@@ -201,16 +212,10 @@ func getItems(c echo.Context) error {
 }
 
 // readItems reads database and returns all the item information.
-func readItems() (Items, error) {
-
-	dbCon, err := connectDB(DBPath)
-	if err != nil {
-		return Items{}, err
-	}
-	defer dbCon.Close()
+func (db *ServerImpl) readItems() (Items, error) {
 
 	const selectAllItems = "SELECT items.name, categories.name FROM items JOIN categories ON items.category_id = categories.id"
-	rows, err := dbCon.Query(selectAllItems)
+	rows, err := db.DB.Query(selectAllItems)
 	if err != nil {
 		return Items{}, err
 	}
@@ -224,20 +229,12 @@ func readItems() (Items, error) {
 	return *items, nil
 }
 
-func searchItems(c echo.Context) error {
+func (db *ServerImpl) searchItems(c echo.Context) error {
 	keyword := c.QueryParam("keyword")
 	key := "%" + keyword + "%"
 
-	dbCon, err := connectDB(DBPath)
-	if err != nil {
-		c.Logger().Errorf("Error while connecting to database: %w", err)
-		res := Response{Message: "Error while connecting to database"}
-		return echo.NewHTTPError(http.StatusInternalServerError, res)
-	}
-	defer dbCon.Close()
-
 	const searchWithKey = "SELECT items.name, categories.name FROM items JOIN categories ON items.category_id = categories.id WHERE items.name LIKE ?"
-	rows, err := dbCon.Query(searchWithKey, key)
+	rows, err := db.DB.Query(searchWithKey, key)
 	if err != nil {
 		c.Logger().Errorf("Error while searching with keyword: %w", err)
 		res := Response{Message: "Error while searching with keyword"}
@@ -272,7 +269,7 @@ func getImg(c echo.Context) error {
 }
 
 // getInfo gets detailed information of the designeted item by id.
-func getInfoById(c echo.Context) error {
+func (db *ServerImpl) getInfoById(c echo.Context) error {
 	itemId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.Logger().Errorf("Invalid ID: %w", err)
@@ -280,17 +277,9 @@ func getInfoById(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, res)
 	}
 
-	dbCon, err := connectDB(DBPath)
-	if err != nil {
-		c.Logger().Errorf("Error while connecting to database: %w", err)
-		res := Response{Message: "DError while connecting to database"}
-		return echo.NewHTTPError(http.StatusInternalServerError, res)
-	}
-	defer dbCon.Close()
-
 	var item Item
 	selectById := "SELECT items.name, categories.name, items.image_name FROM items JOIN categories ON items.category_id = categories.id WHERE items.id = ?"
-	rows := dbCon.QueryRow(selectById, itemId)
+	rows := db.DB.QueryRow(selectById, itemId)
 	err = rows.Scan(&item.Name, &item.Category, &item.ImageName)
 	if err != nil {
 		c.Logger().Errorf("Error while searching item with ID: %w", err)
@@ -328,13 +317,22 @@ func main() {
 		AllowMethods: []string{http.MethodGet, http.MethodPut, http.MethodPost, http.MethodDelete},
 	}))
 
+	// connect to database
+	dbCon, err := connectDB(DBPath)
+	if err != nil {
+		log.Errorf("Error whole connecting to database: %w", err)
+	}
+	defer dbCon.Close()
+
+	db := ServerImpl{DB: dbCon}
+
 	// Routes
 	e.GET("/", root)
-	e.POST("/items", addItem)
-	e.GET("/items", getItems)
+	e.POST("/items", db.addItem)
+	e.GET("/items", db.getItems)
 	e.GET("/image/:imageFilename", getImg)
-	e.GET("/items/:id", getInfoById)
-	e.GET("/search", searchItems)
+	e.GET("/items/:id", db.getInfoById)
+	e.GET("/search", db.searchItems)
 
 	// Start server
 	e.Logger.Fatal(e.Start(":9000"))
