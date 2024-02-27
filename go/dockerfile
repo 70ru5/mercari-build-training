@@ -1,8 +1,23 @@
-FROM alpine
+FROM golang:alpine
 
+#必要なファイルをインストール
+RUN apk update && apk add git
+RUN apk add --no-cache go gcc musl-dev
+
+WORKDIR /app
+
+COPY . .
+
+#権限の設定
 RUN addgroup -S mercari && adduser -S trainee -G mercari
-# RUN chown -R trainee:mercari /path/to/db
+RUN chown -R trainee:mercari db
+RUN chown -R trainee:mercari images
+RUN chown trainee:mercari go.sum
+RUN chown trainee:mercari go.mod
 
+#以降はtraineeとして実行
 USER trainee
 
-CMD ["go", "version"]
+RUN go mod download
+
+CMD ["go", "run", "app/main.go"]
