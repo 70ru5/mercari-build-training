@@ -32,6 +32,7 @@ type Response struct {
 }
 
 type Item struct {
+	Id        int    `json:"id,omitempty"`
 	Name      string `json:"name"`
 	Category  string `json:"category"`
 	ImageName string `json:"image_name,omitempty"`
@@ -216,7 +217,7 @@ func (db *ServerImpl) getItems(c echo.Context) error {
 // readItems reads database and returns all the item information.
 func (db *ServerImpl) readItems() (Items, error) {
 
-	const selectAllItems = "SELECT items.name, categories.name FROM items JOIN categories ON items.category_id = categories.id"
+	const selectAllItems = "SELECT items.id, items.name, categories.name FROM items JOIN categories ON items.category_id = categories.id"
 	rows, err := db.DB.Query(selectAllItems)
 	if err != nil {
 		return Items{}, err
