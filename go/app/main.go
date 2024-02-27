@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	ImgDir = "images"
-	DBPath = "./db/mercari.sqlite3"
+	ImgDir               = "images"
+	DBPath               = "./db/mercari.sqlite3"
+	itemsSchemaPath      = "./db/items.db"
+	categoriesSchemaPath = "./db/categories.db"
 )
 
 type Response struct {
@@ -290,6 +292,40 @@ func (db *ServerImpl) getInfoById(c echo.Context) error {
 	return c.JSON(http.StatusOK, item)
 }
 
+func (db *ServerImpl) createTables() error {
+
+	err := db.createTable(itemsSchemaPath)
+	if err != nil {
+		log.Errorf("Error while creating items table: %w", err)
+		return err
+	}
+
+	err = db.createTable(categoriesSchemaPath)
+	if err != nil {
+		log.Errorf("Error while creating categories table: %w", err)
+		return err
+	}
+
+	return nil
+}
+
+func (db *ServerImpl) createTable(schemaPath string) error {
+
+	tableSchema, err := os.ReadFile(schemaPath)
+	if err != nil {
+		log.Errorf("Error while reading schema: %w", err)
+		return err
+	}
+
+	_, err = db.DB.Exec(string(tableSchema))
+	if err != nil {
+		log.Errorf("error while making a new table: %w", err)
+		return err
+	}
+
+	return nil
+}
+
 // 　connectDB opens database connection.
 func connectDB(dbPath string) (*sql.DB, error) {
 	dbCon, err := sql.Open("sqlite3", dbPath)
@@ -320,11 +356,17 @@ func main() {
 	// connect to database
 	dbCon, err := connectDB(DBPath)
 	if err != nil {
-		log.Errorf("Error whole connecting to database: %w", err)
+		log.Errorf("Error while connecting to database: %w", err)
 	}
 	defer dbCon.Close()
 
 	db := ServerImpl{DB: dbCon}
+
+	// ensure tables exist
+	err = db.createTables()
+	if err != nil {
+		log.Errorf("Error while creating tables: %w", err)
+	}
 
 	// Routes
 	e.GET("/", root)

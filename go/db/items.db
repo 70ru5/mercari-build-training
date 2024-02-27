@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS items (
+    id integer primary key, 
+    name text not null, 
+    category_id integer not null, 
+    image_name text not null, 
+    foreign key (category_id) references categories (id)
+    );
