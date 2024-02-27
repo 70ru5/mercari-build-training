@@ -9,7 +9,7 @@ WORKDIR /app
 COPY . .
 
 #デバッグ用
-RUN ls -la
+#RUN ls -la
 
 #権限の設定
 RUN addgroup -S mercari && adduser -S trainee -G mercari
