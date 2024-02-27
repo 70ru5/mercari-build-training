@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 CREATE TABLE IF NOT EXISTS categories (
-    id integer primary key, 
-    name text unique not null
+    id INTEGER PRIMARY KEY, 
+    name TEXT UNIQUE NOT NULL
     );
-=======
-CREATE TABLE categories (id integer primary key, name text unique not null);
->>>>>>> step4
