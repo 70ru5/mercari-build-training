@@ -23,4 +23,6 @@ USER trainee
 
 RUN go mod download
 
+EXPOSE 9000
+
 CMD ["go", "run", "app/main.go"]
