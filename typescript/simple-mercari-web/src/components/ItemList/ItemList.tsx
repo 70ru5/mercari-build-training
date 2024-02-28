@@ -43,7 +43,7 @@ export const ItemList: React.FC<Prop> = (props) => {
     if (reload) {
       fetchItems();
     }
-  }, [reload]);
+  }, [reload, fetchItems]);
 
   return (
     <div>
@@ -51,7 +51,7 @@ export const ItemList: React.FC<Prop> = (props) => {
         return (
           <div key={item.id} className='ItemList'>
             {/* TODO: Task 1: Replace the placeholder image with the item image */}
-            <img src={placeholderImage} />
+            <img src={placeholderImage} alt = {`PlaceHolder`} />
             <p>
               <span>Name: {item.name}</span>
               <br />
