@@ -51,6 +51,7 @@ export const ItemList: React.FC<Prop> = (props) => {
         {items.map((item) => {
           return (
             <div key = {item.id} className='Item'>
+            <a href = {`${server}/items/${item.id}`} target="_blank">
               {/* TODO: Task 1: Replace the placeholder image with the item image */}
               <img src={`${server}/image/${item.id}`} alt = {`${item.id}`} />
               <p>
@@ -58,6 +59,7 @@ export const ItemList: React.FC<Prop> = (props) => {
                 <br />
                 <span>Category: {item.category}</span>
               </p>
+            </a>
             </div>
           )
         })}
