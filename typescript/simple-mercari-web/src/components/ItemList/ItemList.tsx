@@ -43,23 +43,27 @@ export const ItemList: React.FC<Prop> = (props) => {
     if (reload) {
       fetchItems();
     }
-  }, [reload]);
+  }, [reload, fetchItems]);
 
   return (
-    <div>
-      {items.map((item) => {
-        return (
-          <div key={item.id} className='ItemList'>
-            {/* TODO: Task 1: Replace the placeholder image with the item image */}
-            <img src={placeholderImage} />
-            <p>
-              <span>Name: {item.name}</span>
-              <br />
-              <span>Category: {item.category}</span>
-            </p>
-          </div>
-        )
-      })}
+    <div className='ItemListParent'>
+      <div className = "ItemList">
+        {items.map((item) => {
+          return (
+            <div key = {item.id} className='Item'>
+            <a href = {`${server}/items/${item.id}`} target="_blank">
+              {/* TODO: Task 1: Replace the placeholder image with the item image */}
+              <img src={`${server}/image/${item.id}`} alt = {`${item.id}`} />
+              <p>
+                <span>Name: {item.name}</span>
+                <br />
+                <span>Category: {item.category}</span>
+              </p>
+            </a>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 };
