@@ -1,9 +1,13 @@
+
+
+
 .App {
   text-align: center;
 }
 
+
 .Title {
-  background-color: #222427;
+  background-color: #4dc9ff;
   min-height: 8vh;
   display: flex;
   flex-direction: column;
@@ -14,7 +18,7 @@
 }
 
 .Listing {
-  background-color: #222427;
+  background-color: #4dc9ff;
   min-height: 8vh;
   display: flex;
   flex-direction: column;
@@ -24,15 +28,35 @@
   color: white;
 }
 
-.ItemList {
-  background-color: #222427;
-  min-height: 8vh;
+.ItemListParent {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 8vh;
+}
+
+.ItemList {
+  width: 90%;
+  background-color: white;
+  min-height: 8vh;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   align-items: center;
   justify-content: left;
   font-size: calc(10px + 1vmin);
+  text-align: center;
   color: white;
+}
+
+.Item {
+  margin: 5%;
+  background-color:#4dc9ff;;
+}
+
+.Item img {
+  width: 90%;
+  margin-top: 5%;
+
 }
 
 .App-link {
