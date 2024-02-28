@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"strings"
 
 	"database/sql"
 
@@ -47,7 +46,7 @@ type Items struct {
 func (items *Items) ScanRowsToItems(rows *sql.Rows) error {
 	for rows.Next() {
 		var item Item
-		err := rows.Scan(&item.Name, &item.Category)
+		err := rows.Scan(&item.Id, &item.Name, &item.Category)
 		if err != nil {
 			return err
 		}
@@ -217,7 +216,7 @@ func (db *ServerImpl) getItems(c echo.Context) error {
 // readItems reads database and returns all the item information.
 func (db *ServerImpl) readItems() (Items, error) {
 
-	const selectAllItems = "SELECT items.name, categories.name FROM items JOIN categories ON items.category_id = categories.id"
+	const selectAllItems = "SELECT items.id, items.name, categories.name FROM items JOIN categories ON items.category_id = categories.id"
 	rows, err := db.DB.Query(selectAllItems)
 	if err != nil {
 		log.Errorf("Error while selecting all items: %w", err)
@@ -258,23 +257,38 @@ func (db *ServerImpl) searchItems(c echo.Context) error {
 }
 
 // getImg gets the designated image by file name.
-func getImg(c echo.Context) error {
-	// Create image path
-	imgPath := path.Join(ImgDir, c.Param("imageFilename"))
+func (s *ServerImpl) getImg(c echo.Context) error {
 
-	if !strings.HasSuffix(imgPath, ".jpg") {
-		res := Response{Message: "Image path does not end with .jpg"}
-		return c.JSON(http.StatusBadRequest, res)
+	imgId := c.Param("imageFilename")
+	imageId, err := strconv.Atoi(imgId)
+	if err != nil {
+		c.Logger().Errorf("Invalid image id: %w", err)
+		res := Response{Message: "Invalid image id"}
+		return echo.NewHTTPError(http.StatusBadRequest, res)
 	}
+
+	var item Item
+	const selectImageById = "SELECT items.image_name FROM items WHERE items.id = ?"
+	rows := s.DB.QueryRow(selectImageById, imageId)
+	err = rows.Scan(&item.ImageName)
+	if err != nil {
+		c.Logger().Errorf("Error while searching image by ID: %w", err)
+		res := Response{Message: "Error while searching image by ID"}
+		return echo.NewHTTPError(http.StatusInternalServerError, res)
+	}
+
+	imgPath := path.Join(ImgDir, item.ImageName)
+
 	if _, err := os.Stat(imgPath); err != nil {
 		c.Logger().Debugf("Image not found: %s", imgPath)
 		imgPath = path.Join(ImgDir, "default.jpg")
 	}
+
 	return c.File(imgPath)
 }
 
 // getInfo gets detailed information of the designeted item by id.
-func (db *ServerImpl) getInfoById(c echo.Context) error {
+func (s *ServerImpl) getInfoById(c echo.Context) error {
 	itemId, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.Logger().Errorf("Invalid ID: %w", err)
@@ -284,7 +298,7 @@ func (db *ServerImpl) getInfoById(c echo.Context) error {
 
 	var item Item
 	selectById := "SELECT items.name, categories.name, items.image_name FROM items JOIN categories ON items.category_id = categories.id WHERE items.id = ?"
-	rows := db.DB.QueryRow(selectById, itemId)
+	rows := s.DB.QueryRow(selectById, itemId)
 	err = rows.Scan(&item.Name, &item.Category, &item.ImageName)
 	if err != nil {
 		c.Logger().Errorf("Error while searching item with ID: %w", err)
@@ -295,15 +309,15 @@ func (db *ServerImpl) getInfoById(c echo.Context) error {
 	return c.JSON(http.StatusOK, item)
 }
 
-func (db *ServerImpl) createTables() error {
+func (s *ServerImpl) createTables() error {
 
-	err := db.createTable(itemsSchemaPath)
+	err := s.createTable(itemsSchemaPath)
 	if err != nil {
 		log.Errorf("Error while creating items table: %w", err)
 		return err
 	}
 
-	err = db.createTable(categoriesSchemaPath)
+	err = s.createTable(categoriesSchemaPath)
 	if err != nil {
 		log.Errorf("Error while creating categories table: %w", err)
 		return err
@@ -375,7 +389,7 @@ func main() {
 	e.GET("/", root)
 	e.POST("/items", db.addItem)
 	e.GET("/items", db.getItems)
-	e.GET("/image/:imageFilename", getImg)
+	e.GET("/image/:imageFilename", db.getImg)
 	e.GET("/items/:id", db.getInfoById)
 	e.GET("/search", db.searchItems)
 
